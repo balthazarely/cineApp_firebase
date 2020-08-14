@@ -1,0 +1,314 @@
+<template>
+  <section class=" bg-container">
+    <!-- <div class="hero overlay"></div> -->
+    <div
+      class="hero-body banner-image"
+      :style="{
+        height: '60vh',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        backgroundSize: 'cover',
+        backgroundImage: `linear-gradient(rgba(${colorPallet.DarkMuted.r},${colorPallet.DarkMuted.g},${colorPallet.DarkMuted.b},0.6), rgba(${colorPallet.DarkMuted.r},${colorPallet.DarkMuted.g},${colorPallet.DarkMuted.b},1)), url(https://image.tmdb.org/t/p/w780/${movieData.backdrop_path}) `,
+      }"
+    >
+      <!-- movieData.backdrop_path -->
+      <div class="container">
+        <div class="columns is-mobile ">
+          <div class="column is-variable is-3-desktop is-mobile">
+            <figure class="image is-2-by-3">
+              <img
+                class="movie-cover"
+                v-bind:src="
+                  'https://image.tmdb.org/t/p/w200/' + movieData.poster_path
+                "
+              />
+            </figure>
+          </div>
+          <div
+            class="column is-mobile is-multiline is-variable is-two-thirds is-mobile ml-5"
+          >
+            <h1
+              class="title is-3 is-size-4-mobile has-text-white has-text-left has-text-weight-bold"
+            >
+              {{ movieData.title }}
+            </h1>
+
+            <h1
+              class="subtitle is-4 is-size-5-mobile has-text-white has-text-left has-text-weight-light"
+            >
+              {{ trimeDate(movieData.release_date) }}
+            </h1>
+            <div
+              class="container has-text-left mb-5 "
+              style="display: flex; justify-content: flex-start"
+            >
+              <button
+                @click="
+                  addMovieToFavorites(
+                    movieData.id,
+                    movieData.title,
+                    movieData.poster_path,
+                    movieData.overview,
+                    movieData.release_date
+                  )
+                "
+                class="button is-success mr-2"
+              >
+                <span class="icon is-small">
+                  <i class="fas fa-check"></i>
+                </span>
+                <span>Save</span>
+              </button>
+
+              <div class="tags has-addons">
+                <span class="tag is-dark">Rating</span>
+                <span class="tag is-warning">{{ movieData.vote_average }}</span>
+              </div>
+            </div>
+
+            <div class="genre-wrapper">
+              <div v-for="(genre, i) in movieData.genres" :key="i">
+                <span class="tag is-light genres">{{ genre.name }}</span>
+              </div>
+            </div>
+            <h2
+              class="subtitle is-5 is-size-5-mobile has-text-white has-text-left mt-5"
+            >
+              {{ movieData.tagline }}
+            </h2>
+
+            <p
+              class=" is-5 is-size-7-mobile is-size-6-tablet has-text-white has-text-left mt-4"
+            >
+              {{ movieData.overview }}
+            </p>
+            <div class="cast-container" style="display: flex; ">
+              <p
+                class=" title is-6 is-size-7-mobile has-text-white has-text-left mt-4 has-text-weight- "
+                style="margin: 0 5px"
+                v-for="actor in movieCredits"
+                :key="actor.cast_id"
+              >
+                <span> {{ actor.name }}</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="fullhd">
+      <div
+        :style="{
+          background: `rgba(${colorPallet.DarkMuted.r},${colorPallet.DarkMuted.g},${colorPallet.DarkMuted.b}, 1) `,
+        }"
+      >
+        <h1 class="similar-header " style="padding-top: 100px">
+          Similar Movies
+        </h1>
+        <carousel
+          :perPageCustom="[
+            [300, 3],
+            [550, 4],
+            [600, 5],
+            [1024, 6],
+            [1250, 7],
+            [1400, 8],
+            [1500, 10],
+          ]"
+          class="carousel mt-5"
+          :style="{
+            background: `rgba(${colorPallet.DarkMuted.r},${colorPallet.DarkMuted.g},${colorPallet.DarkMuted.b}, 1) `,
+          }"
+        >
+          <slide
+            class="carousel-slide"
+            v-for="movie in similarMovieData"
+            :key="movie.id"
+          >
+            <img
+              class="movie-cover"
+              v-bind:src="
+                'https://image.tmdb.org/t/p/w200/' + movie.poster_path
+              "
+            />
+
+            <router-link
+              :to="{
+                name: 'Movie',
+                params: { movie_id: movie.id },
+              }"
+            >
+              <h1
+                class="title is-7 is-size-7-mobile has-text-white  has-text-weight-bold"
+              >
+                {{ movie.title }}
+              </h1>
+            </router-link>
+          </slide>
+        </carousel>
+      </div>
+    </div>
+  </section>
+</template>
+
+<script>
+import "bulma/css/bulma.css";
+import axios from "axios";
+import db from "@/firebase/init";
+import { Carousel, Slide } from "vue-carousel";
+import * as Vibrant from "node-vibrant";
+import firebase from "firebase";
+
+export default {
+  name: "Movie",
+  components: {
+    Carousel,
+    Slide,
+  },
+  data() {
+    return {
+      apiKey: "5e9bd2fa585826bdfc4233fb6424f425",
+      movieId: this.$route.params.movie_id,
+      movieData: [],
+      movieCredits: [],
+      similarMovieData: [],
+      colorPallet: [],
+      currentUser: false,
+      currentUserUID: false,
+    };
+  },
+  beforeRouteUpdate(to, from, next) {
+    this.movieId = to.params.movie_id;
+    this.fetchData();
+  },
+  created() {
+    console.log("hi");
+    this.fetchData();
+    this.getUser();
+  },
+  methods: {
+    getUser() {
+      if (firebase.auth().currentUser) {
+        this.isLoggedIn = true;
+        this.currentUser = firebase.auth().currentUser.email;
+        this.currentUserUID = firebase.auth().currentUser.uid;
+      }
+      console.log(this.currentUserUID, "logged in user");
+    },
+    addMovieToFavorites(newId, newTitle, poster_path, overview, release_date) {
+      if (this.currentUser == false) {
+        alert("Please login or register to add movies to a watchlist");
+      } else {
+        const query = db
+          .collection("favoriteMovies")
+          .where("movieId", "==", newId)
+          .get()
+          .then((doc) => {
+            if (doc.docs.length >= 1) {
+              console.log("this already exisits");
+            } else {
+              db.collection("favoriteMovies").add({
+                title: newTitle,
+                movieId: newId,
+                poster_path: poster_path,
+                overview: overview,
+                releaseDate: release_date,
+                dateAdded: new Date(),
+                userUID: this.currentUserUID,
+              });
+            }
+          });
+      }
+    },
+    fetchData() {
+      axios
+        .get(
+          `https://api.themoviedb.org/3/movie/${this.movieId}?api_key=${this.apiKey}&language=en-US`
+        )
+        .then((response) => {
+          this.movieData = response.data;
+          console.log(this.movieData);
+        })
+        .then(() => {
+          Vibrant.from(
+            `https://image.tmdb.org/t/p/w185//${this.movieData.poster_path}`
+          )
+            .getPalette()
+            .then((palette) => {
+              this.colorPallet = palette;
+            })
+            .then(() => {
+              console.log(this.colorPallet, "color");
+            });
+        });
+
+      axios
+        .get(
+          `https://api.themoviedb.org/3/movie/${this.movieId}/similar?api_key=${this.apiKey}&language=en-US&page=1`
+        )
+        .then((response) => {
+          let array = response.data.results;
+          let length = array.length;
+          // this.similarMovieData = array.splice(14 + 1, array.length - (14 + 1));
+          this.similarMovieData = response.data.results;
+          console.log(this.similarMovieData, " similar movies");
+        });
+
+      axios
+        .get(
+          `https://api.themoviedb.org/3/movie/${this.movieId}/credits?api_key=${this.apiKey}`
+        )
+        .then((response) => {
+          this.movieCredits = response.data.cast.slice(0, 5);
+          console.log(this.movieCredits, "movie credits");
+        });
+    },
+    trimeDate(date) {
+      let length = date.length;
+      let wantedLength = 6;
+      let math = length - wantedLength;
+      return date.slice(0, math);
+    },
+  },
+};
+</script>
+
+<style lang="sass">
+.container
+  position: relative
+
+.movie-cover
+  border-radius: 10px
+  margin: 10px
+  width: 120px
+
+.similar-header
+  color: white
+  font-size: 20px
+  padding-top: 10px
+
+
+.overlay
+  width: 100%
+  height: 100%
+  background: red
+  position: absolute
+  top: 0
+  opacity: 0.5
+
+
+.carousel-slide
+
+.carousel
+  height: 300px
+
+.genre-wrapper
+  display: flex
+  justify-content: flex-start
+  align-items: center
+  flex-direction: row
+
+.genres
+  display: flex
+  margin: 0px 5px 0px 0px
+</style>
